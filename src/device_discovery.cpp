@@ -62,12 +62,17 @@ void DeviceDiscovery::startDiscovery() {
     std::cout << "Starting device discovery on " << interface_name << std::endl;
     
     auto arp_devices = scanArpTable();
-    
-    auto ping_devices = pingSweep(network_range);
+
+    //auto ping_devices = pingSweep(network_range);
+    auto ping_arp_devices = pingArp(arp_devices);
+
+    for (const std::string& ping_arp : ping_arp_devices) {
+        std::cout << " ping_arp_device " << ping_arp << std::endl;
+    }
     
     std::set<std::string> all_ips;
     all_ips.insert(arp_devices.begin(), arp_devices.end());
-    all_ips.insert(ping_devices.begin(), ping_devices.end());
+    all_ips.insert(ping_arp_devices.begin(), ping_arp_devices.end());
     
     for (const auto& ip : all_ips) {
         DeviceInfo device;
@@ -80,7 +85,7 @@ void DeviceDiscovery::startDiscovery() {
         device.is_online = true;
         device.last_seen = time(nullptr);
         device.first_seen = time(nullptr);
-        
+
         if (!device.mac_address.empty()) {
             discovered_devices[device.mac_address] = device;
             saveDevice(device);
@@ -120,6 +125,19 @@ std::vector<std::string> DeviceDiscovery::pingSweep(const std::string& network) 
     return active_devices;
 }
 
+std::vector<std::string> DeviceDiscovery::pingArp(const std::vector<std::string>& arp_ips) {
+    std::vector<std::string> active_arp_devices;
+
+    for (const auto& ip : arp_ips) {
+        std::string cmd = "ping -c 1 -W 1 " + ip + " > /dev/null 2>&1";
+        if (system(cmd.c_str()) == 0) {
+            active_arp_devices.push_back(ip);
+        }
+    }
+
+    return active_arp_devices;
+}
+
 std::vector<int> DeviceDiscovery::scanPorts(const std::string& ip) {
     std::vector<int> open_ports;
     std::vector<int> common_ports = {22, 23, 53, 80, 443, 993, 995};
@@ -150,15 +168,15 @@ std::vector<int> DeviceDiscovery::scanPorts(const std::string& ip) {
 }
 
 std::string DeviceDiscovery::getMacFromArp(const std::string& ip) {
-    std::string cmd = "arp -n " + ip + " | grep -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'";
+    std::string cmd = "cat /proc/net/arp | tail -n +2 | grep " + ip;
     std::string output = executeCommand(cmd);
+    std::string mac;
     
-    size_t start = output.find(':');
+    size_t start = output.find_first_of(':');
     if (start != std::string::npos) {
-        start = output.rfind(' ', start) + 1;
-        size_t end = output.find(' ', start);
-        if (end != std::string::npos) {
-            return output.substr(start, end - start);
+        mac = output.substr(start - 2, 17);
+        if (mac.length() > 0 ) {
+            return mac;
         }
     }
     
@@ -278,6 +296,8 @@ std::string executeCommand(const std::string& command) {
             result += buffer;
         }
         pclose(pipe);
+    } else {
+        result = "pipe failed";
     }
     return result;
 }

@@ -33,6 +33,7 @@ private:
 
     std::vector<std::string> scanArpTable();
     std::vector<std::string> pingSweep(const std::string& network);
+    std::vector<std::string> pingArp(const std::vector<std::string>& arp_ips);
     std::vector<int> scanPorts(const std::string& ip);
     std::string getMacFromArp(const std::string& ip);
     std::string getHostname(const std::string& ip);
