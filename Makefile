@@ -1,47 +1,27 @@
-include $(TOPDIR)/rules.mk
+CXX ?= g++
+CXXFLAGS ?= -Wall -Wextra -std=c++11 -O2
+LDFLAGS ?=
+LIBS = -lsqlite3 -lpcap -ljson-c
 
-PKG_NAME:=device-discovery
-PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+TARGET = device-discovery
+SRCDIR = src
+INCDIR = include
+SOURCES = $(wildcard $(SRCDIR)/*.c)
+OBJECTS = $(SOURCES:.cpp=.o)
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+all: $(TARGET)
 
-include $(INCLUDE_DIR)/package.mk
+$(TARGET): $(OBJECTS)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-define Package/device-discovery
-  SECTION:=utils
-  CATEGORY:=Utilities
-  TITLE:=Device Discovery
-  DEPENDS:=+libstdcpp +libsqlite3 +libpcap +libjson-c
-  MAINTAINER:=Marek Puzyniak <marek.puzyniak@holisticon.pl>
-endef
+$(SRCDIR)/%.o: $(SRCDIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-define Package/device-discovery/description
-  A C++ application to be run on prplOS.
-endef
+clean:
+	rm -f $(SRCDIR)/*.o $(TARGET)
 
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) ./src/* $(PKG_BUILD_DIR)/
-endef
+install: $(TARGET)
+	install -d $(DESTDIR)/usr/bin
+	install -m 755 $(TARGET) $(DESTDIR)/usr/bin/
 
-define Build/Compile
-	$(MAKE) -C $(PKG_BUILD_DIR) \
-		CC="$(TARGET_CC)" \
-		CXX="$(TARGET_CXX)" \
-		CFLAGS="$(TARGET_CFLAGS)" \
-		CXXFLAGS="$(TARGET_CXXFLAGS)" \
-		LDFLAGS="$(TARGET_LDFLAGS)"
-endef
-
-define Package/device-discovery/install
-	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/device-discovery $(1)/usr/bin/
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/device_discovery.conf $(1)/etc/config/device_discovery
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/device_discovery.init $(1)/etc/init.d/device_discovery
-endef
-
-$(eval $(call BuildPackage,device-discovery))
-
+.PHONY: all clean install
